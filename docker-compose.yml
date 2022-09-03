@@ -1,0 +1,111 @@
+version: '3'
+services:
+  web-api:
+    image: openjdk:8-jre
+    container_name: ruoyi-admin
+    restart: always
+    volumes:
+      - ./services/ruoyi-admin/tom.jar:/home/ruoyi/jar/tom.jar
+      - ./services/ruoyi-admin/startup.sh:/home/ruoyi/startup.sh
+      - ./services/ruoyi-admin/logs:/home/ruoyi/logs
+      - ./services/ruoyi-admin/upload:/home/ruoyi/uploadPath
+    ports:
+      - '8080:8080'
+    entrypoint: sh /home/ruoyi/startup.sh
+    depends_on:
+      - toy-server
+      - mysql
+      - redis
+      - zookeeper
+      - kafka
+
+  toy-server:
+    image: node
+    container_name: toy-server
+    restart: always
+    entrypoint: sh /app/startup.sh
+    volumes:
+      - ./services/toy-server/dist:/app/dist
+      - ./services/toy-server/startup.sh:/app/startup.sh
+    ports:
+      - '3000:3000'
+
+  nginx:
+    image: nginx
+    restart: always
+    ports:
+      - '80:80'
+    container_name: 'nginx'
+    volumes:
+      - ./www/webroot:/webroot
+      - ./www/conf:/etc/nginx/conf.d
+      - ./www/logs:/var/log/nginx
+    depends_on:
+      - web-api
+
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    restart: always
+    ports:
+      - '3306:3306'
+    command: --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - ./mysql/conf/my.conf:/etc/mysql/conf.d/my.conf
+      - ./mysql/mysqldb:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=awY03Na2e8EBIQPw
+
+  redis:
+    image: redis:latest
+    restart: always
+    container_name: redis
+    command: redis-server --appendonly yes --requirepass "awY03Na2e8EBIQPw"
+    ports:
+      - '6379:6379'
+    volumes:
+      - ./redis:/data
+
+  # zookeeper
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    restart: always
+    ports:
+      - '2181:2181'
+  # kafka
+  kafka:
+    image: wurstmeister/kafka
+    privileged: true
+    container_name: kafka
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 挂载 kafka 日志
+      # :前面的路径是你电脑上路径 后面是kafka容器日志路径
+      # - /project/docker-compose/kafka/logs:/kafka/logs
+    ports:
+      - '9092:9092'
+    environment:
+      # client 要访问的 broker 地址
+      KAFKA_ADVERTISED_HOST_NAME: zookeeper
+      # 通过端口连接 zookeeper
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 每个容器就是一个 broker，设置其对应的 ID
+      KAFKA_BROKER_ID: 1
+      # 外部网络只能获取到容器名称，在内外网络隔离情况下
+      # 通过名称是无法成功访问 kafka 的
+      # 因此需要通过绑定这个监听器能够让外部获取到的是 IP
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # kafka 监听器，告诉外部连接者要通过什么协议访问指定主机名和端口开放的 Kafka 服务。
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092
+      # Kafka默认使用-Xmx1G -Xms1G的JVM内存配置，由于服务器小，调整下启动配置
+      # 这个看自己的现状做调整，如果资源充足，可以不用配置这个
+      KAFKA_HEAP_OPTS: '-Xmx256M -Xms128M'
+      # 设置 kafka 日志位置
+      # KAFKA_LOG_DIRS: "/kafka/logs"
+      # 创建默认的Topic
+      KAFKA_CREATE_TOPICS: 'rebateTopic:1:1'
+    depends_on:
+      - zookeeper
