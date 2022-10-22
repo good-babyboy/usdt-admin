@@ -51,7 +51,7 @@ services:
       - '3306:3306'
     command: --default-authentication-plugin=caching_sha2_password
     volumes:
-      - ./database/mysql/app.sql:/docker-entrypoint-initdb.d/app.sql
+      - ./mysql/ryvue.sql:/docker-entrypoint-initdb.d/app.sql
       - ./mysql/conf/my.conf:/etc/mysql/conf.d/my.conf
       - ./mysql/mysqldb:/var/lib/mysql
       - /etc/localtime:/etc/localtime:ro
